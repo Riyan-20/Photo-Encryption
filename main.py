@@ -54,10 +54,12 @@ class PhotoEncryptionApp:
         self.password_entry = tk.Entry(master, show="*")
         self.password_entry.pack()
 
-        self.encrypt_button = tk.Button(master, text="Encrypt and Save", command=self.encrypt_image)
+        self.encrypt_button = tk.Button(master, text="Encrypt", command=self.encrypt_image)
         self.encrypt_button.pack()
 
         self.image_path = None
+        self.ecb_image = None
+        self.ofb_image = None
 
     def select_image(self):
         self.image_path = filedialog.askopenfilename(filetypes=[("Image files", "*.jpg *.png")])
@@ -83,30 +85,68 @@ class PhotoEncryptionApp:
             key = derive_key(password, salt)
 
             ecb_ciphertext = encrypt_des(key, plaintext, 'ECB')
-            ecb_image = bytes_to_image(ecb_ciphertext, original_shape)
+            self.ecb_image = bytes_to_image(ecb_ciphertext, original_shape)
 
             ofb_ciphertext = encrypt_des(key, plaintext, 'OFB')
-            ofb_image = bytes_to_image(ofb_ciphertext, original_shape)
+            self.ofb_image = bytes_to_image(ofb_ciphertext, original_shape)
 
-            self.save_encrypted_images(ecb_image, ofb_image)
+            self.show_encrypted_images()
 
         except Exception as e:
             messagebox.showerror("Error", f"An error occurred: {str(e)}")
 
-    def save_encrypted_images(self, ecb_image, ofb_image):
-        # Get the directory of the original image
+    def show_encrypted_images(self):
+        encrypted_window = tk.Toplevel(self.master)
+        encrypted_window.title("Encrypted Images")
+
+        # ECB Image
+        ecb_frame = tk.Frame(encrypted_window)
+        ecb_frame.pack(side=tk.LEFT, padx=10, pady=10)
+
+        ecb_label = tk.Label(ecb_frame, text="ECB Encrypted")
+        ecb_label.pack()
+
+        ecb_image = self.ecb_image.copy()
+        ecb_image.thumbnail((300, 300))  # Resize for display
+        ecb_photo = ImageTk.PhotoImage(ecb_image)
+        ecb_image_label = tk.Label(ecb_frame, image=ecb_photo)
+        ecb_image_label.image = ecb_photo
+        ecb_image_label.pack()
+
+        ecb_save_button = tk.Button(ecb_frame, text="Save ECB Image",
+                                    command=lambda: self.save_image(self.ecb_image, "ecb"))
+        ecb_save_button.pack()
+
+        # OFB Image
+        ofb_frame = tk.Frame(encrypted_window)
+        ofb_frame.pack(side=tk.RIGHT, padx=10, pady=10)
+
+        ofb_label = tk.Label(ofb_frame, text="OFB Encrypted")
+        ofb_label.pack()
+
+        ofb_image = self.ofb_image.copy()
+        ofb_image.thumbnail((300, 300))  # Resize for display
+        ofb_photo = ImageTk.PhotoImage(ofb_image)
+        ofb_image_label = tk.Label(ofb_frame, image=ofb_photo)
+        ofb_image_label.image = ofb_photo
+        ofb_image_label.pack()
+
+        ofb_save_button = tk.Button(ofb_frame, text="Save OFB Image",
+                                    command=lambda: self.save_image(self.ofb_image, "ofb"))
+        ofb_save_button.pack()
+
+    def save_image(self, image, mode):
         original_dir = os.path.dirname(self.image_path)
         original_name = os.path.splitext(os.path.basename(self.image_path))[0]
-
-        # Save ECB encrypted image
-        ecb_path = os.path.join(original_dir, f"{original_name}_ecb_encrypted.png")
-        ecb_image.save(ecb_path)
-
-        # Save OFB encrypted image
-        ofb_path = os.path.join(original_dir, f"{original_name}_ofb_encrypted.png")
-        ofb_image.save(ofb_path)
-
-        messagebox.showinfo("Success", f"Encrypted images saved as:\n{ecb_path}\n{ofb_path}")
+        save_path = filedialog.asksaveasfilename(
+            initialdir=original_dir,
+            initialfile=f"{original_name}_{mode}_encrypted.png",
+            defaultextension=".png",
+            filetypes=[("PNG files", "*.png")]
+        )
+        if save_path:
+            image.save(save_path)
+            messagebox.showinfo("Success", f"Encrypted image saved as:\n{save_path}")
 
 
 def main():
